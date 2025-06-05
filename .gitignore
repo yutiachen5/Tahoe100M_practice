@@ -1,0 +1,7 @@
+.ipynb_checkpoints/*
+data/*
+saved_mdls/*
+*.err
+*.out
+*.csv
+*.ckpt
