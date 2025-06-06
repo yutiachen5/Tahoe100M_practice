@@ -1,41 +1,31 @@
 import torch
 import torch.nn as nn
-from argparse import Namespace
-from tokenizer.tokenizer import MolTranBertTokenizer
-from train_pubchem_light import LightningModule
-from fast_transformers.masking import LengthMask as LM
-import yaml
+# from pretrained_molformer.tokenizer import MolTranBertTokenizer
+# from train_pubchem_light import LightningModule
+# from fast_transformers.masking import LengthMask as LM
+# import yaml
 
-class MolFormer():
-    # adapted from: https://github.com/IBM/molformer/blob/main/notebooks/pretrained_molformer/frozen_embeddings_classification.ipynb
+class PositionalEncoding(nn.Module):
+    def __init__(self, d_model, dropout, max_len=500):
+        super(PositionalEncoding, self).__init__()
+        self.dropout = nn.Dropout(p=dropout)
 
-    def __init__(self):
-        with open('/hpc/home/yc583/Tahoe100M_practice/pretrained_molformer/hparams.yaml', 'r') as f:
-            config = Namespace(**yaml.safe_load(f))
-        self.tokenizer = MolTranBertTokenizer('/hpc/home/yc583/Tahoe100M_practice/pretrained_molformer/bert_vocab.txt')
-        ckpt = '/hpc/home/yc583/Tahoe100M_practice/pretrained_molformer/checkpoints/N-Step-Checkpoint_3_30000.ckpt'
-        self.model = LightningModule(config, tokenizer.vocab).load_from_checkpoint(ckpt, config=config, vocab=tokenizer.vocab)
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
 
-    def embed(self, smiles):
-        self.model.eval()
-        embeddings = []
-        batch_enc = self.tokenizer.batch_encode_plus(smiles, padding=True, add_special_tokens=True)
-        idx, mask = torch.tensor(batch_enc['input_ids']), torch.tensor(batch_enc['attention_mask'])
-        with torch.no_grad():
-            token_embeddings = self.model.blocks(self.model.tok_emb(idx), length_mask=LM(mask.sum(-1)))
-        # average pooling over tokens
-        input_mask_expanded = mask.unsqueeze(-1).expand(token_embeddings.size()).float()
-        sum_embeddings = torch.sum(token_embeddings * input_mask_expanded, 1)
-        sum_mask = torch.clamp(input_mask_expanded.sum(1), min=1e-9)
-        embedding = sum_embeddings / sum_mask
-        embeddings.append(embedding.detach().cpu())
-        return torch.cat(embeddings)
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model)) # decreases freq of sin encoding
+        pe[:, 0::2] = torch.sin(position * div_term) # even indices
+        pe[:, 1::2] = torch.cos(position * div_term) # odd indices
 
+    def forward(self, x):
+        seq_len = x.size(1) # x: [batch_size, seq_len, d_model]
+        x = x + self.pe[:seq_len, :].unsqueeze(0)
+        return self.dropout(x)
 
 
 class Transformer(nn.Module):
     def __init__(self, gene_emb_dim, num_genes, emb_dim, max_len, num_heads, 
-                num_layers, dim_feedforward, dropout, pretrained_smiles_mdl,
+                num_layers, dim_feedforward, dropout, smiles_emb_dim,
     ):
         super(Transformer, self).__init__()
 
@@ -54,65 +44,48 @@ class Transformer(nn.Module):
             num_layers=num_layers
         )
 
-        # pretrained smiles transformer
-        # adapted from: https://github.com/IBM/molformer/blob/main/notebooks/pretrained_molformer/frozen_embeddings_classification.ipynb
-        with open(pretrained_smiles_mdl + '/hparams.yaml', 'r') as f:
-            config = Namespace(**yaml.safe_load(f))
-        self.smiles_tokenizer = MolTranBertTokenizer(pretrained_smiles_mdl + '/bert_vocab.txt')
-        ckpt = pretrained_smiles_mdl + '/N-Step-Checkpoint_3_30000.ckpt'
-        self.smiles_encoder = LightningModule(config, self.smiles_tokenizer.vocab).load_from_checkpoint(ckpt, config=config, vocab=self.smiles_tokenizer.vocab)
-        smiles_emb_dim = config['n_embd']
-
         self.proj_smiles_input = nn.Linear(smiles_emb_dim, emb_dim)
 
-        self.out = nn.Sequential(
+        self.regression_head = nn.Sequential(
             nn.Linear(emb_dim, emb_dim//2),
             nn.ReLU(),
-            nn.Linear(emb_dim, 1)
+            nn.Linear(emb_dim//2, 1)
         )
-
-    def embed(self, smiles):
-        self.smiles_encoder.eval()
-        embeddings = []
-        batch_enc = self.smiles_tokenizer.batch_encode_plus(smiles, padding=True, add_special_tokens=True)
-        idx, mask = torch.tensor(batch_enc['input_ids']), torch.tensor(batch_enc['attention_mask'])
-        with torch.no_grad():
-            token_embeddings = self.smiles_encoder.blocks(self.smiles_encoder.tok_emb(idx), length_mask=LM(mask.sum(-1)))
-        # average pooling over tokens
-        input_mask_expanded = mask.unsqueeze(-1).expand(token_embeddings.size()).float()
-        sum_embeddings = torch.sum(token_embeddings * input_mask_expanded, 1)
-        sum_mask = torch.clamp(input_mask_expanded.sum(1), min=1e-9)
-        embedding = sum_embeddings / sum_mask
-        embeddings.append(embedding.detach().cpu())
-        return torch.cat(embeddings)
 
     def forward(self, 
                 genes, # [batch_size, max_len]
                 expressions, # [batch_size, max_len]
-                smiles, # single string
-                masks, # [batch_size, max_len] 1: unpadded, 0: padded
+                smiles, # [batch_size, max_len]
+                gene_masks, # [batch_size, max_len] 1: unpadded, 0: padded
+                smiles_masks, # [batch_size, max_len] 1: unpadded, 0: padded
+                smiles_encoder,
                 ):
 
+        # gene features
         genes_emb = self.emb_gene(genes)
         expressions = expressions.unsqueeze(-1) # [batch_size, max_len] -> [batch_size, max_len, 1]
-        expressions_emb = self.proj_expression(expressions) # [batch_size, max_len, 1] -> [batch_size, max_len, emb_dim]
-        gene_expr_emb = genes_emb + expressions_emb # [batch_size, max_len, emb_dim]
-
+        expressions_emb = self.proj_expression(expressions) # [batch_size, max_len, 1] -> [batch_size, max_len, gene_emb_dim]
+        gene_expr_emb = genes_emb + expressions_emb # [batch_size, max_len, gene_emb_dim]
         # filter padded positions out
-        masks = masks.unsqueeze(-1) # [batch_size, max_len] -> [batch_size, max_len, 1]
-        pooled_gene_expr_emb = ((gene_expr_emb * masks).sum(dim=1))/(masks.sum(dim=1, keepdim=True)) # mean pooling: [batch_size, max_len, emb_dim] -> [batch_size, emb_dim]
-        gene_features = self.proj_input(pooled_gene_expr_emb) # [batch_size, emb_dim]
+        pooled_gene_expr_emb = ((gene_expr_emb * gene_masks.unsqueeze(-1)).sum(dim=1))\
+                                /(gene_masks.sum(dim=1, keepdim=True)) # mean pooling: [batch_size, max_len, gene_emb_dim] -> [batch_size, gene_emb_dim]
+        gene_features = self.proj_gene_input(pooled_gene_expr_emb) # [batch_size, emb_dim]
 
 
-        smiles_emb = self.embed(self.smiles).numpy()
+        # smiles features
+        smiles_emb = smiles_encoder(input_ids=smiles, 
+                                    attention_mask=smiles_masks).last_hidden_state # smile_emb_dim=768
+        smiles_emb = smiles_emb[:, 0, :] # CLS token to summarize the emb, [batch_size, smiles_emb_dim]
         smiles_features = self.proj_smiles_input(smiles_emb) # [batch_size, emb_dim]
 
         features = torch.stack([gene_features, smiles_features], dim=0) # [2, batch_size, emb_dim]
         out = self.encoder(features) # [2, batch_size, emb_dim]
         out_pooled = out.mean(dim=0) # mean pooling: [2, batch_size, emb_dim] -> [batch_size, emb_dim]
-        target_pred = self.regressor(out) # [batch_size, 1]
+        pred = self.regression_head(out_pooled) # [batch_size, 1]
+        print(pred.shape)
 
-        return target_pred
+
+        return pred
         
 
 
