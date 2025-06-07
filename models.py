@@ -1,21 +1,20 @@
 import torch
 import torch.nn as nn
-# from pretrained_molformer.tokenizer import MolTranBertTokenizer
-# from train_pubchem_light import LightningModule
-# from fast_transformers.masking import LengthMask as LM
-# import yaml
+import math
 
-class PositionalEncoding(nn.Module):
-    def __init__(self, d_model, dropout, max_len=500):
+class PositionalEncoding(nn.Module): # adpated from: https://stackoverflow.com/questions/77444485/using-positional-encoding-in-pytorch
+    def __init__(self, d_model, dropout, max_len=5000):
         super(PositionalEncoding, self).__init__()
         self.dropout = nn.Dropout(p=dropout)
 
         pe = torch.zeros(max_len, d_model)
         position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
 
-        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model)) # decreases freq of sin encoding
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model)) 
         pe[:, 0::2] = torch.sin(position * div_term) # even indices
         pe[:, 1::2] = torch.cos(position * div_term) # odd indices
+
+        self.register_buffer('pe', pe)
 
     def forward(self, x):
         seq_len = x.size(1) # x: [batch_size, seq_len, d_model]
@@ -32,6 +31,8 @@ class Transformer(nn.Module):
         self.emb_gene = nn.Embedding(num_genes, gene_emb_dim) # [batch_size, emb_dim]
         self.proj_expression = nn.Linear(1, gene_emb_dim)
         self.proj_gene_input = nn.Linear(gene_emb_dim, emb_dim)
+        self.pos_encoder = PositionalEncoding(emb_dim, dropout, max_len)
+        
 
         self.encoder = nn.TransformerEncoder(
             nn.TransformerEncoderLayer(
@@ -39,7 +40,7 @@ class Transformer(nn.Module):
                 nhead=num_heads,
                 dim_feedforward=dim_feedforward,
                 dropout=dropout,
-                activation="relu"
+                batch_first=True,
             ),
             num_layers=num_layers
         )
@@ -47,8 +48,11 @@ class Transformer(nn.Module):
         self.proj_smiles_input = nn.Linear(smiles_emb_dim, emb_dim)
 
         self.regression_head = nn.Sequential(
+            nn.LayerNorm(emb_dim),
+            nn.Dropout(dropout),
             nn.Linear(emb_dim, emb_dim//2),
             nn.ReLU(),
+            nn.Dropout(dropout),
             nn.Linear(emb_dim//2, 1)
         )
 
@@ -78,12 +82,12 @@ class Transformer(nn.Module):
         smiles_emb = smiles_emb[:, 0, :] # CLS token to summarize the emb, [batch_size, smiles_emb_dim]
         smiles_features = self.proj_smiles_input(smiles_emb) # [batch_size, emb_dim]
 
-        features = torch.stack([gene_features, smiles_features], dim=0) # [2, batch_size, emb_dim]
-        out = self.encoder(features) # [2, batch_size, emb_dim]
-        out_pooled = out.mean(dim=0) # mean pooling: [2, batch_size, emb_dim] -> [batch_size, emb_dim]
+        features = torch.stack([gene_features, smiles_features], dim=1) # [batch_size, 2, emb_dim]
+        # positional encoding
+        features = self.pos_encoder(features)
+        out = self.encoder(features) # [batch_size, 2, emb_dim]
+        out_pooled = out.mean(dim=1) # mean pooling: [batch_size, 2, emb_dim] -> [batch_size, emb_dim]
         pred = self.regression_head(out_pooled) # [batch_size, 1]
-        print(pred.shape)
-
 
         return pred
         

@@ -14,5 +14,6 @@ def collate(batch, smiles_tokenizer):
                                     return_tensors='pt',)
     smiles_input_ids = smiles_tokens['input_ids']
     smiles_attention_masks = smiles_tokens['attention_mask']
+    targets = torch.tensor(list(targets), dtype=torch.float32)
 
-    return padded_genes, padded_expressions, gene_padding_masks, smiles_input_ids, smiles_attention_masks, list(targets)
+    return padded_genes, padded_expressions, gene_padding_masks, smiles_input_ids, smiles_attention_masks, targets

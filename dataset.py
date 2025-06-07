@@ -25,7 +25,7 @@ class TahoeDataset(Dataset):
         gene = torch.tensor([self.gene_idx_map[idx] for idx in eval(self.genes[i])], dtype=torch.long)
         expression = torch.tensor(eval(self.expressions[i]), dtype=torch.float32)
         smiles = self.smiles[i]
-        target = torch.tensor(self.targets[i], dtype=torch.float32)
+        target = self.targets[i]
 
         return gene, expression, smiles, target
 

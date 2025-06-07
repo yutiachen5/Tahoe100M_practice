@@ -1,12 +1,11 @@
 .ipynb_checkpoints/*
 saved_mdls/*
 **/__pycache__/*
+wandb/*
 
 *.err
-*.out
 *.csv
 *.xlsx
 *.ckpt
 *.err
-*.out
 *.gz
