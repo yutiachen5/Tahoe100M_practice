@@ -1,5 +1,5 @@
-dcc-core-gpu-43
-Sun Jun  8 11:17:00 2025       
+dcc-core-gpu-42
+Sun Jun  8 13:36:55 2025       
 +-----------------------------------------------------------------------------------------+
 | NVIDIA-SMI 560.35.05              Driver Version: 560.35.05      CUDA Version: 12.6     |
 |-----------------------------------------+------------------------+----------------------+
@@ -8,7 +8,7 @@ Sun Jun  8 11:17:00 2025
 |                                         |                        |               MIG M. |
 |=========================================+========================+======================|
 |   0  NVIDIA RTX 5000 Ada Gene...    On  |   00000000:13:00.0 Off |                    0 |
-| 30%   18C    P8             13W /  250W |       2MiB /  30712MiB |      0%      Default |
+| 30%   16C    P8             14W /  250W |       2MiB /  30712MiB |      0%      Default |
 |                                         |                        |                  N/A |
 +-----------------------------------------+------------------------+----------------------+
                                                                                          
@@ -54,20 +54,3 @@ Transformer(
     (5): Linear(in_features=256, out_features=1, bias=True)
   )
 )
-number of params:  11378177
-number of trainable params:  11378177
-Epoch [1/10]  Train Loss: 3.0594  Val Loss: 2.7768
-Epoch [2/10]  Train Loss: 2.8052  Val Loss: 2.7652
-Epoch [3/10]  Train Loss: 2.7733  Val Loss: 2.7165
-Epoch [4/10]  Train Loss: 2.6313  Val Loss: 2.2092
-Epoch [5/10]  Train Loss: 1.9725  Val Loss: 1.6935
-Epoch [6/10]  Train Loss: 1.7269  Val Loss: 1.5995
-Epoch [7/10]  Train Loss: 1.6284  Val Loss: 1.5114
-Epoch [8/10]  Train Loss: 1.5686  Val Loss: 1.5626
-Epoch [9/10]  Train Loss: 1.5100  Val Loss: 1.4334
-Epoch [10/10]  Train Loss: 1.4585  Val Loss: 1.4703
-MSE: 1.5161, PCC: 0.9065, SCC: 0.9004
-model saved to /hpc/home/yc583/Tahoe100M_practice/saved_mdls/ic50_predictor.pth
-[1;34mwandb[0m: 
-[1;34mwandb[0m: 🚀 View run [33mtest_run[0m at: [34mhttps://wandb.ai/tecchk-cyt-duke-university/Tahoe/runs/ob7ke11n[0m
-[1;34mwandb[0m: Find logs at: [1;35mwandb/run-20250608_111711-ob7ke11n/logs[0m

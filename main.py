@@ -1,4 +1,5 @@
 import numpy as np
+import time
 import argparse
 import random
 import os
@@ -12,9 +13,11 @@ from collate import collate
 from torch.utils.data import DataLoader, random_split
 from pretrained_ChemBERT.smiles_emb import SmilesEmb
 from functools import partial
+from copy import deepcopy
 from sklearn.metrics import mean_squared_error
 from scipy.stats import pearsonr, spearmanr
 
+taskID=int(os.environ['SLURM_ARRAY_TASK_ID'])
 
 def seed_everything(seed):    
     random.seed(seed)
@@ -61,11 +64,15 @@ def validate(model, val_loader, use_cuda, smiles_encoder):
     return val_loss
 
 
-def train(model, train_loader, val_loader, num_epochs, use_cuda, optimizer, smiles_encoder, scheduler):
+def train(model, train_loader, val_loader, num_epochs, use_cuda, optimizer, smiles_encoder, args):
     if use_cuda:
         model.cuda()
         smiles_encoder.cuda()
+
     criterion = nn.MSELoss()
+    min_val_loss = 1000
+    epoch_no_improve = 0
+    best_mdl = None
 
     for i in range(1, num_epochs+1):
         model.train()
@@ -80,7 +87,6 @@ def train(model, train_loader, val_loader, num_epochs, use_cuda, optimizer, smil
             loss = criterion(preds.squeeze(-1), targets)
             loss.backward()
             optimizer.step()
-            # scheduler.step()
 
             train_loss_sum += loss.item() 
         train_loss = train_loss_sum/len(train_loader)
@@ -89,9 +95,21 @@ def train(model, train_loader, val_loader, num_epochs, use_cuda, optimizer, smil
         print(f"Epoch [{i}/{num_epochs}]  Train Loss: {train_loss:.4f}  Val Loss: {val_loss:.4f}")
         wandb.log({'train loss':train_loss, 'validation loss':val_loss})
 
+        if val_loss < min_val_loss:
+            min_val_loss = val_loss
+            best_mdl = deepcopy(model)
+            epoch_no_improve = 0
+        else:
+            epoch_no_improve += 1
+        if epoch_no_improve >= args.patience:
+            print(f"Training complete. Best validation loss: {min_val_loss:.4f}")
+            break
+    return best_mdl
+
     
 
 def main():
+    startTime = time.time()
     parser = argparse.ArgumentParser('Predicting IC50 based on gene, gene expression, and drug smiles.')
 
     parser.add_argument('--d-model', type=int, default=512, help='the number of expected features in the encoder/decoder inputs (default=256)')
@@ -102,11 +120,12 @@ def main():
     parser.add_argument('--max-length', type=int, default=6000, help='maximum length (default: 512)')
     parser.add_argument('--gene-emb-dim', type=int, default=128, help='embeding dimension of gene and gene expression (default:128)')
 
-    parser.add_argument('--data', default='/hpc/home/yc583/Tahoe100M_practice/data/Tahoe_GDSC_processed.csv', help='path to training dataset')
+    parser.add_argument('--data', default='/hpc/group/biostat/yc583/Tahoe_GDSC_0.2.csv.gz', help='path to training dataset')
+    parser.add_argument('--patience', type=int, default=3, help='patience for early stopping (default: 3)')
     parser.add_argument('--pretrained-smiles-mdl', type=str, default='seyonec/ChemBERTa-zinc-base-v1', help='base path to pretrained smiles transformer')
     parser.add_argument('--val-size', type=float, default=0.15, help='size in percentage of validation and testing (default: 0.15)')
     parser.add_argument('--batch-size', type=int, default=256, help='minibatch size (default: 256)')
-    parser.add_argument('-n', type=int, default=10, help='number of training epoches (default: 10)')
+    parser.add_argument('-n', type=int, default=100, help='number of training epoches (default: 100)')
     parser.add_argument('--lr', type=float, default=1e-4, help='learning rate (default: 1e-4)')
     parser.add_argument('-o', help='output file path', default='/hpc/home/yc583/Tahoe100M_practice/saved_mdls/')
     parser.add_argument('--seed', help='random seed', type=int, default=1124)
@@ -116,6 +135,10 @@ def main():
 
     args = parser.parse_args()
 
+    all_configs = [s for s in [100, 200, 300]] # 3 replicated runs with different random seeds
+    args.seed = all_configs[taskID]
+    args.name = 'run_s_'+str(args.seed)
+
     wandb.init(
         project="Tahoe",
         name=args.name, 
@@ -123,6 +146,7 @@ def main():
     )
 
     seed_everything(args.seed)
+
     d = args.d
     use_cuda = (d != -1) and torch.cuda.is_available()
     if d >= 0:
@@ -131,14 +155,13 @@ def main():
     smiles_emb = SmilesEmb(pretrained_smiles_mdl = args.pretrained_smiles_mdl)
     smiles_tokenizer = smiles_emb.get_tokenizer()
     smiles_encoder, smiles_emb_dim = smiles_emb.get_encoder()
-
     for param in smiles_encoder.parameters():
         param.requires_grad = False
 
     TahoeData = TahoeDataset(args.data)
-    print(f'loaded {len(TahoeData)} observations')
+    print(f'loaded {len(TahoeData)} observations', flush=True)
     num_genes = TahoeData.get_num_genes()
-    print(f'number of unique genes: {num_genes}')
+    print(f'number of unique genes: {num_genes}', flush=True)
 
     n_val = int(len(TahoeData)*args.val_size)
     train_dataset, val_test_dataset = random_split(TahoeData, [len(TahoeData) - 2*n_val, 2*n_val])
@@ -153,7 +176,7 @@ def main():
     model = Transformer(gene_emb_dim=args.gene_emb_dim, num_genes=num_genes, emb_dim=args.d_model, num_heads=args.nhead, num_layers=args.nlayer, 
                         dim_feedforward=args.dim_feedforward, 
                         dropout=args.dropout, max_len=args.max_length, smiles_emb_dim=smiles_emb_dim,)
-    print(model)
+    print(model, flush=True)
 
     total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -163,12 +186,17 @@ def main():
     optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size = 1, gamma=0.95)
 
-    train(model,  train_loader, val_loader, args.n, use_cuda, optimizer, smiles_encoder, scheduler)
-    predict(model, test_loader, use_cuda, smiles_encoder)
+    print('training...')
+    best_mdl = train(model,  train_loader, val_loader, args.n, use_cuda, optimizer, smiles_encoder, args)
+    print('predicting...')
+    predict(best_mdl, test_loader, use_cuda, smiles_encoder)
 
-    save_path = args.o + 'ic50_predictor.pth'
+    save_path = args.o + args.name+'_ic50_predictor.pth'
     torch.save(model.state_dict(), save_path)
     print(f"model saved to {save_path}")
+
+    endTime = time.time()
+    print("Elapsed time:", round(endTime-startTime/3600,1), "hours")
 
 if __name__ == '__main__':
     main()

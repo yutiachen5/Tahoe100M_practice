@@ -4,7 +4,12 @@ from torch.utils.data import Dataset
 
 class TahoeDataset(Dataset):
     def __init__(self, path):
-        df = pd.read_csv(path)
+        if path.endswith('.gz'):
+            df = pd.read_csv(path, compression='gzip')
+        else:
+            df = pd.read_csv(path)
+        
+        df = df[['genes', 'expressions','canonical_smiles','LN_IC50']]
         df['genes'] = df['genes'] 
         df['expression'] = df['expressions']
         self.genes = df['genes']
@@ -23,7 +28,7 @@ class TahoeDataset(Dataset):
 
     def __getitem__(self, i):
         gene = torch.tensor([self.gene_idx_map[idx] for idx in eval(self.genes[i])], dtype=torch.long)
-        expression = torch.tensor(eval(self.expressions[i]), dtype=torch.float32)
+        expression = torch.tensor([float(x) for x in eval(self.expressions[i])], dtype=torch.float32)
         smiles = self.smiles[i]
         target = self.targets[i]
 
