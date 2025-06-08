@@ -33,6 +33,8 @@ Due to the limited diversity of SMILES strings in the final dataset, training a 
 
 On the test set, the model achieved an MSE of 3, a PCC of 0.5, and an SCC of 0.6. Training and validation loss curves are shown below. The Transformer model is good at capturing global context. Genes do not act independently to influence the drug sensitivity, instead, they may interact with each other within the network. The self-attention mechanism in the Transformer enables the model to learn these interactions, and the positional encoding helps preserve structural information in the input.
 
+![Training and Validation Loss Curve](train_val_loss.png)
+
 The results suggest that gene expression and chemical structure are 2 important predictors for drug sensitivity. Gene expression reflects the biological state of the cell line, while chemical structure captures critical properties of the drug.
 
 
