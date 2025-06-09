@@ -30,7 +30,7 @@ Due to the limited diversity of SMILES strings in the final dataset, training a 
 
  - computational resources
 
- The training process will take around 7 hours on GPU TX5000 Ada with 100GB memory. Please see [train slurm](train.sh) for references.
+ The training process will take around 7 hours on GPU RTX Ada 5000 with 100GB memory. Please see [train slurm](slurms/train_array.sh) for references.
 
 **Results & Discussions**
 

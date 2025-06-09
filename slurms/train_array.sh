@@ -7,7 +7,7 @@
 #SBATCH -e /hpc/home/yc583/Tahoe100M_practice/slurms/%a.err
 #SBATCH --exclusive
 #SBATCH --gres=gpu:1
-#SBATCH --array=3-5%3
+#SBATCH --array=0-2%3
 #SBATCH -p gpu-common,scavenger-gpu,biostat-gpu
 #SBATCH --nice=100
 #SBATCH --mem=100GB
@@ -16,4 +16,4 @@
 
 hostname
 nvidia-smi
-python /hpc/home/yc583/Tahoe100M_practice/main.py --patience 6
+python /hpc/home/yc583/Tahoe100M_practice/main.py 
