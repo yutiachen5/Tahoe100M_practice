@@ -136,7 +136,7 @@ def main():
     args = parser.parse_args()
 
     all_configs = [s for s in [100, 200, 300]] # 3 replicated runs with different random seeds
-    args.seed = all_configs[taskID]
+    args.seed = all_configs[taskID-3]
     args.name = 'run_s_'+str(args.seed)
 
     wandb.init(

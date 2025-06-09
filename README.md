@@ -8,19 +8,21 @@ This project explores half-maximal inhibitory concentration (IC50) prediction us
 
 **Motivation**
 
-During the cancer treatment, precise therapy is getting more and more important since the variability among individuals exist. Hence, IC50, an important measurement for drug sensitivity, is worth re-visiting. Inspired by the work of Carvalho et al. (2022), this project aims to explore the possibility of predicting IC50 using the chemical structures of drugs and the gene expression profiles of cancer cell lines. The model takes drug smiles, gene ids, and gene expressions as input and achieves a MSE of 1.5, a Pearson Correlation Coefficient (PCC) of 0.9, and a Spearman Correlation Coefficient (SCC) of 0.9.
+During the cancer treatment, precise therapy is getting more and more important since the variability among individuals exist. Hence, IC50, an important measurement for drug sensitivity, is worth re-visiting. Inspired by the work of Carvalho et al. (2022), this project aims to explore the possibility of predicting IC50 using the chemical structures of drugs and the gene expression profiles of cancer cell lines. The model takes drug SMILES, gene ids, and gene expressions as input and achieves a MSE of 0.227, a Pearson Correlation Coefficient (PCC) of 0.98, and a Spearman Correlation Coefficient (SCC) of 0.98.
 
 **Data**
 
-The primary database used in this study is Tahoe-100M (Zhang et al., 2025). The complete Tahoe database cotains 100M observations of gene expression data, including genes, gene expressions, drug name, and canonical smiles. Due to the time limit, this study only use a subset of Tahoe-100M gene expression dataset. Details on the subsetting procedure can be found in [downsample](downsample.py).
+The primary database used in this study is Tahoe-100M (Zhang et al., 2025). The complete Tahoe database cotains 100M observations of gene expression data, including genes, gene expressions, drug name, and canonical SMILES. Due to the time limit, this study only use a subset of Tahoe-100M gene expression dataset. Details on the subsetting procedure can be found in [downsample](downsample.py).
 
 The prediction target IC50s are obtained from GDSC database. After combining GDSC1 and GDSC2, the dataset contained 575,197 observations. Drug name and cell line name were used as composite keys. For duplicated values of IC50 within a single version of GDSC, aggregated mean is used. For duplicated observations between 2 versions of GDSC, DGSC2 value is considered more updated and is kept in the processed dataset. Please see [pre-processing](preprocessing.ipynb) for more details.
 
-The combined dataset contains 1,652,583 observations after merging downsampled Tahoe dataset and processed GDSC dataset by drug name and cell-line. Due to storage limitations, 20% of the merged dataset was randomly sampled for model training, resulting in a final dataset of 330,517 observations, covering 20 unique drugs and 28 unique cell lines. IC50 values (on a natural log scale) ranged from -7 to 5, with a mean of 1.6 and a standard deviation of 2.9. More details of descriptive analysis can be found in [pre-processing](preprocessing.ipynb).
+The combined dataset contains 1,652,583 observations after merging downsampled Tahoe dataset and processed GDSC dataset by drug name and cell-line. Due to storage limitations, 20% of the merged dataset was randomly sampled for model training, resulting in a final dataset of 330,517 observations, covering 20 unique drugs and 28 unique cell lines. IC50 values (on a natural log scale) ranged from -7 to 5, with a mean of 1.6 and a standard deviation of 2.9. More details of descriptive analysis can be found in [pre-processing](preprocessing.ipynb). The distribution of prediction target is shown below.
+
+![Distribution of log(IC50)](ic50_distn.png)
 
 **Methods**
 
-Due to the limited diversity of SMILES strings in the final dataset, training a SMILES encoder from scratch was impractical. So, this study uses the pretrained ChemBERTa (Chithrananda et al., 2020) to encode drug smiles. ChemBERTa is trained on a large chemical corpus and captures rich chemical features with a state-of-art performance. Gene features were created by combining gene ID embeddings with gene expression embeddings. And then the drug and gene features are combined for the input of a Transformer encoder. The default setting of model architecture contains an absolute positional encoding layer, 3 encoder layer, and a regression head composed of a two-layer MLP with ReLU activation. The total number of trainable parameters is 11,378,177. Please visit [training log] (slurms/0.out) for references.
+Due to the limited diversity of SMILES strings in the final dataset, training a SMILES encoder from scratch was impractical. So, this study uses the pretrained ChemBERTa (Chithrananda et al., 2020) to encode drug SMILES. ChemBERTa is trained on a large chemical corpus and captures rich chemical features with a state-of-art performance. Gene features were created by combining gene ID embeddings with gene expression embeddings. And then the drug and gene features are combined for the input of a Transformer encoder. The default setting of model architecture contains an absolute positional encoding layer, 3 encoder layer, and a regression head composed of a two-layer MLP with ReLU activation. The total number of trainable parameters is 11,378,177. Please visit [training log] (slurms/0.out) for references.
 
  - training settings
 
@@ -31,11 +33,11 @@ Due to the limited diversity of SMILES strings in the final dataset, training a 
 
 **Results & Discussions**
 
-On the test set, the model achieved an MSE of 3, a PCC of 0.5, and an SCC of 0.6. Training and validation loss curves are shown below. The Transformer model is good at capturing global context. Genes do not act independently to influence the drug sensitivity, instead, they may interact with each other within the network. The self-attention mechanism in the Transformer enables the model to learn these interactions, and the positional encoding helps preserve structural information in the input.
+On the testing set, the best model achieved an MSE of 0.227, a PCC of 0.98, and an SCC of 0.98. Training and validation loss curves shown below are aggregated from 3 runs with different random seeds to aviod randomness. The Transformer model is good at capturing global context. Genes do not act independently to influence the drug sensitivity, instead, they may interact with each other within the network. The self-attention mechanism in the Transformer enables the model to learn these interactions, and the positional encoding helps preserve structural information in the input.
 
 ![Training and Validation Loss Curve](train_val_loss.png)
 
-The results suggest that gene expression and chemical structure are 2 important predictors for drug sensitivity. Gene expression reflects the biological state of the cell line, while chemical structure captures critical properties of the drug.
+The results suggest that gene expression and chemical structure are 2 important predictors for drug sensitivity. Gene expression reflects the biological state of the cell line, while chemical structure captures critical properties of the drug. In application, if we have the gene expression profile from patient tumor samples and the SMILES of compound to be tested, we are able to predict the sensitivity of a certain drug to a certain patient. This could provide the insights for drug-resistances and personalized treatments.
 
 
 **Limitations & Future work**

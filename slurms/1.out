@@ -54,3 +54,43 @@ Transformer(
     (5): Linear(in_features=256, out_features=1, bias=True)
   )
 )
+number of params:  11378177
+number of trainable params:  11378177
+training...
+Epoch [1/100]  Train Loss: 3.0660  Val Loss: 2.7457
+Epoch [2/100]  Train Loss: 2.7958  Val Loss: 2.7026
+Epoch [3/100]  Train Loss: 2.7560  Val Loss: 2.6510
+Epoch [4/100]  Train Loss: 2.2879  Val Loss: 2.1615
+Epoch [5/100]  Train Loss: 1.8987  Val Loss: 1.6720
+Epoch [6/100]  Train Loss: 1.7057  Val Loss: 1.6414
+Epoch [7/100]  Train Loss: 1.6087  Val Loss: 1.5017
+Epoch [8/100]  Train Loss: 1.5320  Val Loss: 1.7012
+Epoch [9/100]  Train Loss: 1.4769  Val Loss: 1.5054
+Epoch [10/100]  Train Loss: 1.4242  Val Loss: 1.4393
+Epoch [11/100]  Train Loss: 1.3707  Val Loss: 1.3543
+Epoch [12/100]  Train Loss: 1.2927  Val Loss: 1.2229
+Epoch [13/100]  Train Loss: 1.1931  Val Loss: 1.1164
+Epoch [14/100]  Train Loss: 1.0827  Val Loss: 0.9530
+Epoch [15/100]  Train Loss: 0.9609  Val Loss: 0.8359
+Epoch [16/100]  Train Loss: 0.8514  Val Loss: 0.7755
+Epoch [17/100]  Train Loss: 0.7559  Val Loss: 0.6803
+Epoch [18/100]  Train Loss: 0.6806  Val Loss: 0.7193
+Epoch [19/100]  Train Loss: 0.6026  Val Loss: 0.5075
+Epoch [20/100]  Train Loss: 0.5301  Val Loss: 0.4704
+Epoch [21/100]  Train Loss: 0.4830  Val Loss: 0.5017
+Epoch [22/100]  Train Loss: 0.4561  Val Loss: 0.4462
+Epoch [23/100]  Train Loss: 0.4019  Val Loss: 0.4528
+Epoch [24/100]  Train Loss: 0.3829  Val Loss: 0.4600
+Epoch [25/100]  Train Loss: 0.3551  Val Loss: 0.3149
+Epoch [26/100]  Train Loss: 0.3311  Val Loss: 0.2626
+Epoch [27/100]  Train Loss: 0.3150  Val Loss: 0.5187
+Epoch [28/100]  Train Loss: 0.3047  Val Loss: 0.2661
+Epoch [29/100]  Train Loss: 0.2934  Val Loss: 0.2860
+Training complete. Best validation loss: 0.2626
+predicting...
+MSE: 0.2604, PCC: 0.9849, SCC: 0.9855
+model saved to /hpc/home/yc583/Tahoe100M_practice/saved_mdls/ic50_predictor.pth
+Elapsed time: 1748943353.9 hours
+[1;34mwandb[0m: 
+[1;34mwandb[0m: 🚀 View run [33mrun_s_200[0m at: [34mhttps://wandb.ai/tecchk-cyt-duke-university/Tahoe/runs/kns0lcmx[0m
+[1;34mwandb[0m: Find logs at: [1;35mwandb/run-20250608_133709-kns0lcmx/logs[0m
