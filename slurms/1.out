@@ -90,7 +90,6 @@ Training complete. Best validation loss: 0.2626
 predicting...
 MSE: 0.2604, PCC: 0.9849, SCC: 0.9855
 model saved to /hpc/home/yc583/Tahoe100M_practice/saved_mdls/ic50_predictor.pth
-Elapsed time: 1748943353.9 hours
 [1;34mwandb[0m: 
 [1;34mwandb[0m: 🚀 View run [33mrun_s_200[0m at: [34mhttps://wandb.ai/tecchk-cyt-duke-university/Tahoe/runs/kns0lcmx[0m
 [1;34mwandb[0m: Find logs at: [1;35mwandb/run-20250608_133709-kns0lcmx/logs[0m

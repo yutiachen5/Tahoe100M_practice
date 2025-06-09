@@ -1,5 +1,4 @@
 import numpy as np
-import time
 import argparse
 import random
 import os
@@ -109,7 +108,6 @@ def train(model, train_loader, val_loader, num_epochs, use_cuda, optimizer, smil
     
 
 def main():
-    startTime = time.time()
     parser = argparse.ArgumentParser('Predicting IC50 based on gene, gene expression, and drug smiles.')
 
     parser.add_argument('--d-model', type=int, default=512, help='the number of expected features in the encoder/decoder inputs (default=256)')
@@ -195,8 +193,6 @@ def main():
     torch.save(model.state_dict(), save_path)
     print(f"model saved to {save_path}")
 
-    endTime = time.time()
-    print("Elapsed time:", round(endTime-startTime/3600,1), "hours")
 
 if __name__ == '__main__':
     main()
