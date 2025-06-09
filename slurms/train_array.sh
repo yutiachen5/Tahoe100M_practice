@@ -1,7 +1,6 @@
 #!/bin/sh
 #
 #SBATCH --get-user-env
-#SBATCH -A naderilab
 #SBATCH -J train-array
 #SBATCH -o /hpc/home/yc583/Tahoe100M_practice/slurms/%a.out
 #SBATCH -e /hpc/home/yc583/Tahoe100M_practice/slurms/%a.err
